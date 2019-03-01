@@ -1,0 +1,44 @@
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+#
+#   Listing of Physical Chemistry Data to Specific Mechanism Species
+#     Molecular diffusivity in air (cm2/sec)
+#     Effective Henry's Law Coefficients (M/atm)
+#     Wesely's Reactivity Parameters for leaf surface deposition (0-1)
+#
+#   Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS)
+#
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+# racm2_plus gas-phase mechanism       
+# 
+# racm2_plus      MolecDiff         EffHenry          Reactivity
+  iNO              0.1802            0.0019              0.0
+  iNO2             0.1361            0.0120              0.1
+  iO3              0.1444            0.0103              1.0
+  iHONO            0.1349            2.6D+05             0.1
+  iHNO4            0.1041            1.0D+07             0.0
+  iHNO3            0.1041            3.2D+13             0.0
+  iN2O5            0.0808            1.0D+14             0.0
+  iCO              0.1807            9.8D-04             0.0
+  iH2O2            0.1300            8.4D+04             1.0
+  iCH4             0.1952            1.4D-03             0.0
+  iMO2             0.1297            6.9D+02             0.0
+  iOP1             0.1200            3.0D+02             0.0
+  iMOH             0.1297            2.2D+02             0.0
+  iNO3             0.1153            0.0380              0.0
+  iO3P             0.2773            0.0380              0.0
+  iO1D             0.2773            0.0380              0.0
+  iHO              0.2543            3.9D+01             0.1
+  iHO2             0.2000            6.9D+02             0.1
+  iORA1            0.1340            5.6D+03             0.0
+  iHAC             0.1060            2.0D+03             0.0
+  iPAA             0.1040            5.2D+02             0.1
+  iDHMOB           0.0892            2.0D+03             0.0
+  iHPALD           0.0845            4.0D+04             0.0
+  iISHP            0.0837            7.0D+07             0.0
+  iIEPOX           0.0837            7.0D+07             0.0
+  iPROPNN          0.0834            1.0D+04             0.0
+  iISOPNB          0.0750            5.0D+03             0.0
+  iISOPND          0.0750            5.0D+03             0.0
+  iMACRN           0.0745            6.0D+03             0.0
+  iMVKN            0.0745            6.0D+03             0.0
+  iISNP            0.0712            5.0D+03             0.0

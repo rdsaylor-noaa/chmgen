@@ -1,0 +1,31 @@
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+#
+#   Listing of mechanism species to output as ppbv. If not included here, species is output as molec/cm3
+#   Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS)
+#
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+# listing for the racm2_plus gas-phase mechanism       
+#
+# species
+  iNO
+  iNO2
+  iO3
+  iHONO
+  iHNO3
+  iHNO4
+  iN2O5
+  iCH4
+  iHCHO
+  iCO
+  iH2O2
+  iISO
+  iORA1
+  iMVK
+  iMACR
+  iAPI
+  iLIM
+  iGLY
+  iMGLY
+  iPAN
+  iPPN
+  iMPAN

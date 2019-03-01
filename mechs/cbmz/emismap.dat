@@ -1,0 +1,21 @@
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+#
+#   Emissions Mapping of Raw Species to Specific Mechanism Species
+#   Read by chmgen in the code generation system of the
+#   Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS)
+#
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+# mapping for the cbmz gas-phase mechanism       
+#
+# cbmz                  MEGAN mapping
+  iISOP                 bisop bmbo
+  iHCHO                 bhcho
+  iCO                   bco
+  iC2H6                 betha
+  iCH3OH                bmeoh
+  iALD2                 baald
+  iAONE                 bacet
+  iC2H4                 bethe
+  iOLET                 bbute
+  iHCOOH                bform
+  iRCOOH                bacta

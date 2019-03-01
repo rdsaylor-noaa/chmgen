@@ -1,0 +1,24 @@
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+#
+#   Emissions Mapping of Raw Species to Specific Mechanism Species
+#   Read by chmgen in the code generation system of the
+#   Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS)
+#
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+# mapping for the racm2_plus gas-phase mechanism       
+#
+# racm2_plus            MEGAN mapping
+  iISO                  bisop bmbo
+  iLIM                  bmyrc blimo bocim bpcym bocym batrp bgtrp bbphe bafrn bbcro
+  iAPI                  bsabi bcare bapin bbpin
+  iMOH                  bmeoh
+  iACT                  bacet
+  iETE                  bethe
+  iOLT                  bbute
+  iETH                  betha
+  iEOH                  betoh
+  iACD                  baald
+  iHCHO                 bhcho
+  iORA1                 bform
+  iORA2                 bacta
+  iCO                   bco

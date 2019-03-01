@@ -1,0 +1,18 @@
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+#
+#   Emissions Mapping of Raw Species to Specific Mechanism Species
+#   Read by chmgen in the code generation system of the
+#   Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS)
+#
+#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!#########!
+# mapping for the original mozart gas-phase mechanism       
+#
+# mozart                MEGAN mapping
+  iC5H8                 bisop bmbo
+  iHCHO                 bhcho
+  iCO                   bco
+  iC2H6                 betha
+  iC2H4                 bethe
+  iCH3CHO               baald
+  iCH3COCH3             bacet
+  iTERP                 bmyrc blimo bocim bpcym bocym batrp bgtrp bbphe bafrn bbcro bsabi bcare bapin bbpin

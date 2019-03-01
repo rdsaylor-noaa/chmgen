@@ -1,0 +1,13 @@
+!$Begin INSERT CODE_GasThermalRateCoeffs
+  real(kind=dp) :: CH3O2, ETHP, RO2, C2O3, ANO2, NAP, ISOPP, ISOPN, ISOPO2, XO2
+
+  CH3O2  = cint(zpt,iCH3O2)
+  ETHP   = cint(zpt,iETHP)
+  RO2    = cint(zpt,iRO2)
+  C2O3   = cint(zpt,iC2O3)
+  ANO2   = cint(zpt,iANO2)
+  NAP    = cint(zpt,iNAP)
+  ISOPP  = cint(zpt,iISOPP)
+  ISOPN  = cint(zpt,iISOPN)
+  ISOPO2 = cint(zpt,iISOPO2)
+  XO2    = cint(zpt,iXO2)

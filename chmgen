@@ -1,0 +1,658 @@
+#!/usr/bin/env python
+#
+# chmgen
+#
+# Reads mechanism and species list files and 3 mechanism-specific mapping files
+# and generates all code necessary for the ACCESS model
+#
+#=====================================================================================!
+#                                                                                     !
+#     Program:      ACCESS                                                            !
+#                   Atmospheric Chemistry and Canopy Exchange Simulation System       !
+#                                                                                     !
+#     Version:      3.1.0                                                             !
+#                                                                                     !
+#     Last Update:  February 2019                                                     !
+#                                                                                     !
+#     Contact:      Rick D. Saylor, PhD                                               !
+#                   Physical Scientist                                                !
+#                   U. S. Department of Commerce                                      !
+#                   National Oceanic and Atmospheric Administration                   !
+#                   Air Resources Laboratory                                          !
+#                   Atmospheric Turbulence and Diffusion Division                     !
+#                   456 S. Illinois Ave                                               !
+#                   Oak Ridge, TN 37830                                               !
+#                   email: Rick.Saylor@noaa.gov                                       !
+#                   Phone: (865) 220-1730                                             !
+#                                                                                     !
+#=====================================================================================!
+#
+import os
+import sys
+import math
+
+# remove leading stoichiometric coefficients (if any) from a token
+def remove_stoich(token):
+    chars = list(token)
+    stoich = ['0','1','2','3','4','5','6','7','8','9','.']
+    n = 0
+    for char in chars:
+        if char in stoich:
+            n+= 1
+        else:
+            break
+    base = token[n:]
+    return base 
+
+# return stoichiometric coefficient from a token
+def get_stoich(token):
+    chars = list(token)
+    stoich = ['0','1','2','3','4','5','6','7','8','9','.']
+    n = 0
+    for char in chars:
+        if char in stoich:
+            n+= 1
+        else:
+            break
+
+    if n == 0:
+       stoich_token=''
+    else:
+       stoich_token=token[0:n] + '*'
+
+    return stoich_token 
+
+# find maximum field width of emitted mechanism species names
+def fndmaxlen(emsp):
+    maxem = 0
+    for isp in emsp:
+        lensp = len(isp)
+        if (lensp > maxem):
+            maxem = lensp
+
+    return maxem
+
+# writes MapRaw2Mech subroutine to "emfile" as defined by mapping
+def wrtMapRaw2Mech(mechname, emfile, emsp, spmap):
+
+    # create subroutine header border string
+    bdr = "!*"
+    n = 118
+    for i in range(n):
+        bdr += "*"
+    bdr += "!\n"
+
+    # write first lines of MapRaw2Mech
+    emfile.write(bdr)
+    emfile.write("! subroutine MapRaw2Mech - map explicit species to mechanism species\n")
+    emfile.write(bdr)
+    emfile.write("subroutine MapRaw2Mech()\n")
+    emfile.write("  integer(kind=i4)  :: iz\n")
+    emfile.write("\n")
+    emfile.write("  ! map to explicit species in mechanism %s\n" % mechname)
+
+    # write loop over domain, assigning raw species to mechanism species
+    emfile.write("  do iz=1,npts\n")
+    maxem = fndmaxlen(emsp)
+    smaxem = str(maxem)
+
+    # write entry for each emitted mechanism species
+    nsl = 4
+    for isp in emsp:
+        sraw = []
+        lraw = spmap[isp]
+        nraw = len(lraw)
+        sraw.append("qraw(iz,"+lraw[0]+")")
+        if (nraw > 1):
+            for n in range(1,nraw):
+                sraw.append("qraw(iz,"+lraw[n]+")")
+        ffmt = "{:>"+smaxem+"}"
+        fisp = ffmt.format(isp)
+
+        if (nraw <= nsl):
+            rhs = "+".join(sraw)
+            emfile.write("    q(iz,"+fisp+")  = "+rhs+"\n")
+        else:
+            nlraw = sraw[0:nsl]
+            rhs = "+".join(nlraw)
+            emfile.write("    q(iz,"+fisp+")  = "+rhs+" &\n")
+            nlines = int(nraw/nsl)
+            ir=nsl
+            for nl in range(1, nlines):
+               nlraw = sraw[ir:ir+nsl]
+               rhs = "+".join(nlraw)
+               emfile.write("                 +"+rhs+" &\n")
+               ir=ir+nsl
+            nlraw = sraw[ir:]
+            rhs = "+".join(nlraw)
+            emfile.write("                 +"+rhs+"\n")
+            
+    emfile.write("  end do\n")
+
+    # write final lines of MapRaw2Mech
+    emfile.write("\n")
+    emfile.write("end subroutine MapRaw2Mech\n")
+    emfile.write("\n")
+    return
+
+# find maximum field width of emitted mechanism species names
+def fndmaxlen(sps):
+    maxsp = 0
+    for isp in sps:
+        lensp = len(isp)
+        if (lensp > maxsp):
+            maxsp = lensp
+    return maxsp
+
+# generates and writes code for PhysChemData:SetMolecDiffSTP
+def genMolecDiffCode(sps, maxsp, mdiff, fhout):
+    for isp in sps:
+        lhs = "mdiffstp("+isp+") "
+        value = mdiff[isp]
+        if (value == "default"):
+            value = "mdiffstp_default"
+        fhout.write("  {0} {1} {2}\n".format(lhs.ljust(maxsp+12), "= ", value))
+    return
+
+# generates and writes code for PhysChemData:SetEffHenrysLawCoeffs
+def genHenrysLawCode(sps, maxsp, henry, fhout):
+    for isp in sps:
+        lhs = "hstar("+isp+") "
+        value = henry[isp]
+        if (value == "default"):
+            value = "hstar_default"
+        fhout.write("  {0} {1} {2}\n".format(lhs.ljust(maxsp+9), "= ", value))
+    return
+
+# generates and writes code for PhysChemData:SetReactivityParams
+def genReactivityCode(sps, maxsp, react, fhout):
+    for isp in sps:
+        lhs = "f0("+isp+") "
+        value = react[isp]
+        if (value == "default"):
+            value = "f0_default"
+        fhout.write("  {0} {1} {2}\n".format(lhs.ljust(maxsp+6), "= ", value))
+    return
+
+
+# start of main
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
+    # enforce proper usage of 1 and only 1 argument
+    if len(argv) != 2:
+        print("usage: %s MECHNAME" % os.path.basename(sys.argv[0]))
+        return 2
+
+    mechname = argv[1]
+
+    # check for new ACCESS directory existence and stop if not there
+    accessdir = "../ACCESS_FULL/ACCESS_FULL_"+mechname
+    if (os.path.exists(accessdir)):
+        print("\nchmgen: Beginning ACCESS code generation for mechanism %s" % mechname)
+        print("        in directory - %s\n" % accessdir)
+    else:
+        print("ERROR!!! Directory %s does not exist!" % accessdir)
+        print("Stopping ...")
+        return 2
+
+    # get mechanism filename and read data 
+    infile = './mechs/'+mechname+'/'+mechname+'.eqn'
+    if (os.path.exists(infile)):
+        print("Reading mechanism file: %s" % infile)
+        with open(infile) as f_infile:
+            mechlines = f_infile.readlines()
+            mechlines = mechlines[1:]   # ignore the header line
+            nrxn = len(mechlines)
+    else:
+        print("ERROR!!! mechanism file %s not found!" % infile)
+        print("Stopping ...")
+        return 2
+
+    # get species list filename and read data
+    infilespc = './mechs/'+mechname+'/'+mechname+'.spc'
+    if (os.path.exists(infilespc)):
+        print("Reading species list from: %s" % infilespc)
+        with open(infilespc) as f_infilespc:
+            speclines = f_infilespc.readlines()
+            nspec = len(speclines)
+            print("Read %d lines from %s" % (nspec, infilespc))
+    else:
+        print("ERROR!!! species list file %s not found!" % infilespc)
+        print("Stopping ...")
+        return 2
+
+    ninteg=nspec
+    nfixed=0
+    nsstate=0
+
+    # create dictionary that associates mechanism species
+    # with unique model species string
+    speclist = list()
+    spindex = dict()
+    for line in speclines:
+        spctokens = line.split()
+        spcstr = spctokens[0].strip()
+        spcind = spctokens[1].strip()
+        speclist.append(spcstr)
+        spindex[spcstr] = spcind
+
+    # determine maximum width of species string
+    ispwidth=0
+    for spcstr in speclist:
+        ispwidth = max(ispwidth, len(spindex[spcstr]))
+    print("max width of species string (ispwidth) = %d" % ispwidth)
+
+    # create code for module GlobalData
+    print('\nBeginning code generation for GlobalData module ...')
+
+    # open base GlobalData module and read lines
+    gdbase = accessdir + "/src/GlobalData_base.f90"
+    if (os.path.exists(gdbase)):
+        print(" Reading base GlobalData module file")
+        with open(gdbase) as fgdbase:
+            gdlines = fgdbase.readlines()
+    else:
+        print("ERROR!!! Base GlobalData module file %s not found!" % gdbase)
+        print("Stopping ...")
+        return 2
+
+    # insert code into mechanism-specific GlobalData module
+    gdnew = accessdir + "/src/GlobalData.f90"
+    with open(gdnew, "w") as fgdnew:
+        for line in gdlines:
+            if line.startswith("!$INSERT MECHANISM"):
+                fgdnew.write('  ! gasmech - unique string defining gas-phase chemical mechanism used\n')
+                fgdnew.write("  character(len=11),parameter :: gasmech='%s'\n" % mechname)
+                fgdnew.write('\n')
+                fgdnew.write('  ! Generated by %s for mechanism %s\n' % (os.path.basename(sys.argv[0]),mechname))
+                fgdnew.write('  ! ninteg - number of integrated species\n')
+                fgdnew.write('  integer(kind=i4), parameter :: ninteg=%d\n' % ninteg)
+                fgdnew.write('  ! nfixed - number of time invariant species\n')
+                fgdnew.write('  integer(kind=i4), parameter :: nfixed=%d\n' % nfixed)
+                fgdnew.write('  ! nsstate - number of steady state species\n')
+                fgdnew.write('  integer(kind=i4), parameter :: nsstate=%d\n' % nsstate)
+                fgdnew.write('  ! ntotal - total number of species\n')
+                fgdnew.write('  integer(kind=i4), parameter :: ntotal=ninteg+nfixed+nsstate\n')
+                fgdnew.write('  ! nrxn - number of chemical reactions\n')
+                fgdnew.write('  integer(kind=i4), parameter :: nrxn=%d\n' % nrxn)
+                fgdnew.write('\n')
+                fgdnew.write('  ! Species indices\n')
+                indsp=0
+                for spcstr in speclist:
+                    indsp+= 1
+                    fgdnew.write('  integer(kind=i4), parameter :: i%-11s = %d\n' % (spindex[spcstr], indsp))
+    
+                fgdnew.write('\n')
+                fgdnew.write('  ! Species strings\n')
+                fgdnew.write('  character(len=%d), parameter, dimension(ntotal) ::  &\n' % ispwidth)
+                fgdnew.write('                     sspc     = (/         &\n')
+                nspec = len(speclist)
+                for i in range(nspec-1):
+                    spcstr = speclist[i]
+                    fgdnew.write("                                   '%-*s', &\n" % (ispwidth,spindex[spcstr]))
+                spcstr = speclist[nspec-1]
+                fgdnew.write("                                   '%-*s'  &\n" % (ispwidth,spindex[spcstr]))
+                fgdnew.write('                                             /)\n')
+
+                # read ppbvmap.dat to obtain species output as ppbv
+                mapfile = "./mechs/"+mechname+"/ppbvmap.dat"
+                if (os.path.exists(mapfile)):
+                    print(" Reading ppbvmap file: %s" % mapfile)
+                else:
+                    print("ERROR!!! ppbvmap file %s not found!" % mapfile)
+                    print("Stopping ...")
+                    return 2
+
+                spppb = []
+                with open(mapfile) as fppb:
+                    ppblines = fppb.readlines()
+                    ppblines = ppblines[9:]     # ignore header lines
+                    for line in ppblines:
+                        tokens = line.split()
+                        spppb.append(tokens[0])
+
+                nppb = len(spppb)
+                snppb = str(nppb)
+                fgdnew.write('\n')
+                fgdnew.write('  ! define output concentration units for each species\n')
+                fgdnew.write('  ! if a species is included in this list, convert to ppbv;\n')
+                fgdnew.write('  ! otherwise, leave as molecules/cm3\n')
+                fgdnew.write('  integer(kind=i4), parameter :: noutppb=%s\n' % snppb)
+                fgdnew.write('  integer(kind=i4), dimension(noutppb) :: outppb\n')
+
+                nperline = 8
+                if (nppb <= nperline):
+                    slist = ", ".join(spppb)
+                    fgdnew.write('  data outppb / %s /\n' % slist)
+                else:
+                    # handle more than one line
+                    inl = (nppb//nperline)     # using floor division operator '//'
+                    fnl = float(nppb)/float(nperline) 
+                    if ( (fnl - float(inl)) > 0.0 ):
+                        nlines = inl+1
+                    else:
+                        nlines = inl
+                    slist = ", ".join(spppb[0:nperline])
+                    fgdnew.write("  data outppb / %s, &\n" % slist)
+                    l=nperline
+                    for nl in range(1,nlines-1):
+                        slist = ", ".join(spppb[l:l+nperline])
+                        fgdnew.write("                %s, &\n" % slist)
+                        l=l+nperline
+                    slist = ", ".join(spppb[(nlines-1)*nperline:])
+                    fgdnew.write("                %s /\n" % slist)
+
+            else:
+                fgdnew.write(line)
+
+    print("Finished code generation for GlobalData module\n")
+
+    # GasChem module
+    print("Beginning code generation for GasChem module ...")
+
+    # open base GasChem module and read lines
+    gcbase = accessdir + "/src/GasChem_base.f90"
+    if (os.path.exists(gcbase)):
+        print(" Reading base GasChem module ...")
+        with open(gcbase) as fgcbase:
+            gclines = fgcbase.readlines()
+    else:
+        print("ERROR!!! Base GasChem module file %s not found!" % mapfile)
+        print("Stopping ...")
+        return 2
+
+    # insert mechanism-specific code into module GasChem
+    gcnew = accessdir + "/src/GasChem.f90"
+    with open(gcnew, "w") as fgcnew:
+
+        for line in gclines:
+      
+            # create code for subroutine fgaschem in module GasChem
+            if line.startswith("!$INSERT fgaschem"):
+                print(" Writing code to GasChem:fgaschem...")
+
+                fgcnew.write('  ! Generated by %s for mechanism %s\n' % (os.path.basename(sys.argv[0]),mechname))
+                maxch = 90
+                for species in speclist:
+                    odespec = ''
+                    rxn = 0
+                    for mline in mechlines:
+                        rxn+= 1
+                        tokens = mline.split()
+                        icolon = tokens.index(':')
+                        tokens = tokens[1:icolon]  # ignore the reaction number and everything beyond the colon
+                        stoich_sign = '-'
+                        prev_token = "#"
+                        for token in tokens:
+                            base_token = remove_stoich(token)
+                            if base_token == '->' or base_token == '=':
+                                stoich_sign = '+'
+                            if base_token == species:
+                                stoich_token = get_stoich(token)
+                                # handle the case for CBM mechs where "products" can be consumed instead
+                                # of produced (i.e., PAR)
+                                if ( (stoich_sign == "+") and (prev_token == "-") ):
+                                    odespec+= "-" + stoich_token + 'r(%d)' % rxn
+                                else:
+                                    odespec+= stoich_sign + stoich_token + 'r(%d)' % rxn
+                            prev_token = base_token
+                    lhsstr = 'yp(i'+spindex[species]+') '
+                    # if necessary, split odespec across multiple lines
+                    lodespec = len(odespec)
+                    if lodespec <= maxch:
+                        # fits on one line
+                        fgcnew.write('  %-*s = %s\n' % (ispwidth+6,lhsstr,odespec)) 
+                    else:
+                        # find a good spot to split first line
+                        chi = odespec.find('r(',maxch-8,maxch+8)
+                        # write the first line
+                        fgcnew.write('  %-*s = %s &\n' % (ispwidth+6,lhsstr,odespec[0:chi-1])) 
+                        # handle 2nd through next to last lines
+                        charsrem = lodespec - chi + 1
+                        while (charsrem > maxch):
+                            clo = chi-1
+                            # find a good spot to split the current line
+                            chi  = odespec.find('r(',clo+maxch-8,clo+maxch+8)
+                            # add "ispwidth+10" spaces on the left to indent the line properly
+                            lline=chi-clo+1
+                            strline = odespec[clo:chi-1].rjust(lline+ispwidth+10)
+                            # write the current line
+                            fgcnew.write('%s &\n' % strline)
+                            charsrem = lodespec - chi + 1
+                        # write the last line, again indenting properly
+                        clo = chi-1
+                        lline = lodespec-clo+2
+                        strline = odespec[clo:].rjust(lline+ispwidth+10)
+                        fgcnew.write('%s\n' % strline)
+
+
+            # create code for subroutine RxnRates in module GasChem
+            elif line.startswith("!$INSERT RxnRates"):
+                print(" Writing code to GasChem:RxnRates...")
+
+                fgcnew.write('  ! Generated by %s for mechanism %s\n' % (os.path.basename(sys.argv[0]),mechname))
+                rxn = 0
+                for mline in mechlines:
+                    rxn += 1
+                    tokens = mline.split()
+                    tokens = tokens[1:]   # ignore the reaction number
+                    # leave only reactant tokens
+                    try:
+                        iarrow = tokens.index('->')
+                    except ValueError:
+                        iarrow = -1
+                    try:
+                        iequal = tokens.index('=')
+                    except ValueError:
+                        iequal = -1
+                    if iarrow != -1:
+                        tokens = tokens[0:iarrow]
+                    elif iequal != -1:
+                        tokens = tokens[0:iequal]
+
+                    while '+' in tokens:
+                        tokens.remove('+')
+                    if 'hv' in tokens:
+                        tokens.remove('hv')
+
+                    spstr=''
+                    for token in tokens:
+                        species = remove_stoich(token)
+                        if species == 'O2':
+                            spstr+= '*O2'
+                        elif species == 'N2':
+                            spstr+= '*N2'
+                        elif species == 'M':
+                            spstr+= '*AIR'
+                        elif species == 'H2O':
+                            spstr+= '*H2O'
+                        elif species == 'H2':
+                            spstr+= '*H2'
+                        else:
+                            spstr+= '*y(i'+spindex[species]+')' 
+
+                    lhsstr = 'r('+str(rxn)+') '
+                    fgcnew.write('  %-8s = k(%s)%s\n' % (lhsstr, str(rxn), spstr))
+
+            # create code for nighttime rates in subroutine GasPhotoRateCoeffs in module GasChem
+            elif line.startswith("!$INSERT night_GasPhoto"):
+                print(" Writing code to GasChem:GasPhoto_night...")
+
+                fgcnew.write('  ! Nighttime values set to zero\n')
+                fgcnew.write('  ! Generated by %s for mechanism %s\n' % (os.path.basename(sys.argv[0]),mechname))
+                rxn=0
+                for mline in mechlines:
+                    rxn+= 1
+                    tokens = mline.split()
+                    icolon = tokens.index(':')
+                    ieol   = tokens.index(';')
+                    rc = ' '.join(tokens[icolon+1:ieol])
+                    lhsstr = 'k('+str(rxn)+') '
+                    if rc.startswith('kphoto') or 'hv' in tokens:
+                        fgcnew.write('  %-8s = 0.0\n' % (lhsstr)) 
+
+            # create code for daytime rates in subroutine GasPhotoRateCoeffs in module GasChem
+            elif line.startswith("!$INSERT GasPhoto"):
+                print(" Writing code to GasChem:GasPhoto...")
+
+                fgcnew.write('  ! Daytime values mapped to output from CalcJPhoto\n')
+                fgcnew.write('  ! Generated by %s for mechanism %s\n' % (os.path.basename(sys.argv[0]),mechname))
+                rxn=0
+                for mline in mechlines:
+                    rxn+= 1
+                    tokens = mline.split()
+                    icolon = tokens.index(':')
+                    ieol   = tokens.index(';')
+                    rc = ' '.join(tokens[icolon+1:ieol])
+                    lhsstr = 'k('+str(rxn)+') '
+                    if rc.startswith('kphoto') or 'hv' in tokens:
+                        fgcnew.write('  %-8s = %s\n' % (lhsstr, rc)) 
+
+            # if there's code to be inlined, add it here
+            elif line.startswith("!$INSERT CODE_GasThermal"):
+                cdefile = "./mechs/"+mechname+"/"+mechname+".cde"
+                if (os.path.exists(cdefile)):
+                    print(" Reading additional code file: %s" % cdefile)
+                    with open(cdefile) as fcde:
+                        cdelines = fcde.readlines()
+                        cdelines = cdelines[1:]       # drop header line
+                        for cdeline in cdelines:
+                            fgcnew.write(cdeline)
+
+            # create code for subroutine GasThermalRateCoeffs in module GasChem
+            elif line.startswith("!$INSERT GasThermal"):
+                print(" Writing code to GasChem:GasThermal...")
+
+                fgcnew.write('  ! Generated by %s for mechanism %s\n' % (os.path.basename(sys.argv[0]),mechname))
+                rxn=0
+                for mline in mechlines:
+                    rxn+= 1
+                    tokens = mline.split()
+                    icolon = tokens.index(':')
+                    ieol   = tokens.index(';')
+                    rc = ' '.join(tokens[icolon+1:ieol])
+                    lhsstr = 'k('+str(rxn)+') '
+                    if not (rc.startswith('kphoto')) :
+                        fgcnew.write('  %-8s = %s\n' % (lhsstr, rc))
+
+            else:
+                fgcnew.write(line)
+    
+    print("Finished code generation for GasChem module\n")
+
+    # Emissions module
+    print("Beginning code generation for Emissions module ...")
+
+    # create subroutine MapRaw2Mech in Emissions module
+    # get species mapping filename and attach filehandle
+    mapfile = "./mechs/"+mechname+"/emismap.dat"
+    if (os.path.exists(mapfile)):
+       print(" Reading emissions species mapping file: %s" % mapfile)
+    else:
+       print("ERROR!!! Emissions species mapping file %s not found!" % mapfile)
+       print("Stopping ...")
+       return 2
+
+    emsp = []
+    spmap = {}
+    with open(mapfile) as fmap:
+        maplines = fmap.readlines()
+        maplines = maplines[10:]     # ignore header lines
+        for line in maplines:
+            tokens = line.split()
+            sp0 = tokens[0]
+            emsp.append(sp0) 
+            spmap[sp0] = tokens[1:]
+
+    # open base Emissions module and read lines
+    emfnin = accessdir+"/src/Emissions_base.f90"
+    if (os.path.exists(emfnin)):
+        print(" Reading base Emissions module ...")
+        with open(emfnin) as f_emfnin:
+            emislines = f_emfnin.readlines()
+    else:
+        print("ERROR!!! Base Emissions module file %s not found!" % mapfile)
+        print("Stopping ...")
+        return 2
+
+
+    # create Emissions module with mapped species
+    with open(accessdir+"/src/Emissions.f90", "w") as emfile:
+
+        for line in emislines:
+            if line.startswith("!$INSERT MapRaw2Mech"):
+               print (" Inserting MapRaw2Mech into Emissions module")
+               wrtMapRaw2Mech(mechname, emfile, emsp, spmap)
+            else:
+               emfile.write(line)
+
+    print("Finished code generation for Emissions module\n")
+
+    # create code for subroutines MolecDiff, EffHenrysLaw, and ReactivityParams 
+    # in PhysChemData module
+    print("Beginning code generation for PhysChemData module ...")
+
+    # open base PhysChemData module and read lines
+    pcfnin = accessdir+"/src/PhysChemData_base.f90"
+    if (os.path.exists(pcfnin)):
+        print(" Reading base PhysChemData module ...")
+        with open(pcfnin) as fpc:
+            pclines = fpc.readlines()
+    else:
+        print("ERROR!!! Base PhysChemData module file %s not found!" % mapfile)
+        print("Stopping ...")
+        return 2
+
+    # read phys chem data from pchmmap.dat
+    mapfile = "./mechs/"+mechname+"/pchmmap.dat"
+    if (os.path.exists(mapfile)):
+        print(" Reading phys chem data for mechanism species: %s" % mapfile)
+    else:
+        print("ERROR!!! Phys-chem data file %s not found!" % mapfile)
+        print("Stopping ...")
+        return 2
+
+    sps = []
+    mdiff = {}
+    henry = {}
+    react = {}
+     
+    with open(mapfile) as fmap:
+        maplines = fmap.readlines()
+        maplines = maplines[13:]       # ignore header lines
+        for line in maplines:
+            tokens = line.split()
+            sp0 = tokens[0]
+            sps.append(sp0)
+            mdiff[sp0] = tokens[1]
+            henry[sp0] = tokens[2]
+            react[sp0] = tokens[3]
+
+    maxsp = fndmaxlen(sps)
+
+    # insert code into PhysChemData module
+    with open(accessdir+"/src/PhysChemData.f90", "w") as fpcnew:
+
+        for line in pclines:
+            if line.startswith("!$INSERT MolecDiff"):
+               print (" Inserting generated code into PhysChemData:SetMolecDiffSTP")
+               genMolecDiffCode(sps, maxsp, mdiff, fpcnew)
+            elif line.startswith("!$INSERT EffHenrysLaw"):
+               print (" Inserting generated code into PhysChemData:SetEffHenrysLawCoeffs")
+               genHenrysLawCode(sps, maxsp, henry, fpcnew)
+            elif line.startswith("!$INSERT ReactivityParams"):
+               print (" Inserting generated code into PhysChemData:SetReactivityParams")
+               genReactivityCode(sps, maxsp, react, fpcnew)
+            else:
+               fpcnew.write(line)
+
+    print("Finished code generation for PhysChemData module\n")
+
+    print("Finished ACCESS code generation!")
+
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
