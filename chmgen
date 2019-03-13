@@ -181,14 +181,22 @@ def main(argv=None):
         argv = sys.argv
 
     # enforce proper usage of 1 and only 1 argument
-    if len(argv) != 2:
-        print("usage: %s MECHNAME" % os.path.basename(sys.argv[0]))
+    if len(argv) != 3:
+        print("usage: %s MODTYPE MECHNAME" % os.path.basename(sys.argv[0]))
+        print("  where,")
+        print("          MODTYPE  = 'FULL' or 'BOX'")
+        print("          MECHNAME = chemical mechanism name in 'mechs'")
         return 2
 
-    mechname = argv[1]
+    modtype  = argv[1]
+    if (modtype.lower() == "box"):
+        modtype = "Box"
+    else:
+        modtype = "FULL"
+    mechname = argv[2]
 
     # check for new ACCESS directory existence and stop if not there
-    accessdir = "../ACCESS_FULL/ACCESS_FULL_"+mechname
+    accessdir = "../ACCESS_"+modtype+"/ACCESS_"+modtype+"_"+mechname
     if (os.path.exists(accessdir)):
         print("\nchmgen: Beginning ACCESS code generation for mechanism %s" % mechname)
         print("        in directory - %s\n" % accessdir)
